@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>iPad Tower Defense</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        body { margin: 0; background: #222; color: white; font-family: sans-serif; overflow: hidden; touch-action: none; }
+        canvas { display: block; background: #333; margin: 0 auto; border: 2px solid #555; }
+        #ui { position: absolute; top: 10px; left: 10px; pointer-events: none; }
+        .stat { font-size: 20px; font-weight: bold; text-shadow: 2px 2px 0 #000; }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <div class="stat">Lives: <span id="lives">20</span></div>
+        <div class="stat">Gold: $<span id="gold">100</span></div>
+    </div>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Adjust for iPad screen size
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let gold = 100;
+        let lives = 20;
+        const towers = [];
+        const enemies = [];
+        const path = [
+            {x: 0, y: canvas.height/2},
+            {x: canvas.width * 0.3, y: canvas.height/2},
+            {x: canvas.width * 0.3, y: canvas.height * 0.2},
+            {x: canvas.width * 0.7, y: canvas.height * 0.2},
+            {x: canvas.width * 0.7, y: canvas.height * 0.8},
+            {x: canvas.width, y: canvas.height * 0.8}
+        ];
+
+        function spawnEnemy() {
+            enemies.push({
+                x: path[0].x,
+                y: path[0].y,
+                health: 50,
+                pathIndex: 0,
+                speed: 2
+            });
+        }
+
+        canvas.addEventListener('touchstart', (e) => {
+            const touch = e.touches[0];
+            if (gold >= 50) {
+                towers.push({x: touch.clientX, y: touch.clientY, range: 100, cooldown: 0});
+                gold -= 50;
+                document.getElementById('gold').innerText = gold;
+            }
+        });
+
+        function update() {
+            // Move enemies
+            enemies.forEach((enemy, index) => {
+                const target = path[enemy.pathIndex + 1];
+                if (target) {
+                    const dx = target.x - enemy.x;
+                    const dy = target.y - enemy.y;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    if (dist < 5) {
+                        enemy.pathIndex++;
+                    } else {
+                        enemy.x += (dx/dist) * enemy.speed;
+                        enemy.y += (dy/dist) * enemy.speed;
+                    }
+                } else {
+                    enemies.splice(index, 1);
+                    lives--;
+                    document.getElementById('lives').innerText = lives;
+                }
+            });
+
+            // Tower Logic
+            towers.forEach(t => {
+                if (t.cooldown > 0) t.cooldown--;
+                const target = enemies.find(e => Math.hypot(e.x - t.x, e.y - t.y) < t.range);
+                if (target && t.cooldown === 0) {
+                    target.health -= 10;
+                    t.cooldown = 30;
+                    if (target.health <= 0) {
+                        enemies.splice(enemies.indexOf(target), 1);
+                        gold += 20;
+                        document.getElementById('gold').innerText = gold;
+                    }
+                }
+            });
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw Path
+            ctx.strokeStyle = '#555';
+            ctx.lineWidth = 40;
+            ctx.beginPath();
+            ctx.moveTo(path[0].x, path[0].y);
+            path.forEach(p => ctx.lineTo(p.x, p.y));
+            ctx.stroke();
+
+            // Draw Towers
+            ctx.fillStyle = '#3498db';
+            towers.forEach(t => {
+                ctx.beginPath();
+                ctx.arc(t.x, t.y, 15, 0, Math.PI*2);
+                ctx.fill();
+            });
+
+            // Draw Enemies
+            ctx.fillStyle = '#e74c3c';
+            enemies.forEach(e => {
+                ctx.beginPath();
+                ctx.arc(e.x, e.y, 10, 0, Math.PI*2);
+                ctx.fill();
+            });
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        setInterval(spawnEnemy, 2000);
+        gameLoop();
+    </script>
+</body>
+</html>
